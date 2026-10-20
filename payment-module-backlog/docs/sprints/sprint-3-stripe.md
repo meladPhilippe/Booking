@@ -5,7 +5,7 @@
 ## PAY-010 — Implement Stripe provider adapter for card checkout
 **Priority:** Must
 
-**Story**  
+**Story**
 As a customer, I want to pay by card through Stripe's supported checkout flow, so that my payment can be processed without the module handling raw card data.
 
 **Acceptance criteria**
@@ -45,6 +45,33 @@ As an operator, I want Stripe configuration validated and integration failures d
 - Provider operational errors are distinguishable from customer declines in logs/metrics.
 - Health/readiness behaviour reflects required local dependencies and configuration; a transient provider outage does not falsely mark every existing payment as failed.
 
-**Sprint 3 demo:** A test client starts a Stripe sandbox card checkout; the resulting payment status becomes accurate through the API and/or a verified webhook, including a failed/declined scenario.
+## PAY-013 — Add a Stripe Sandbox Provider
+**Priority:** Must
+
+**Story**
+As a developer, I want a selectable Stripe sandbox provider for card payments and refunds, so that I can validate the real Stripe integration safely without handling card data or affecting live payments.
+
+**Acceptance criteria**
+- `StripeProvider` implements `IPaymentProvider` and `IRefundProvider`, supports Card only, and selects test credentials through the Sandbox Stripe profile in Development.
+- It uses Stripe test-mode embedded Checkout, local payment/refund IDs as idempotency keys, and provider-neutral outcomes; Checkout Session and PaymentIntent references are persisted separately.
+- Full and partial refunds use the persisted PaymentIntent reference and are safely idempotent.
+- Sandbox startup requires an `sk_test_` key, webhook signing secret, and allowed return origins; no credential or card data is committed, persisted, or logged.
+- Verified sandbox webhooks are deduplicated under the sandbox provider identity and apply only legal payment/refund state transitions.
+- Automated tests cover provider selection, checkout outcomes, refunds, webhook deduplication, and configuration rejection.
+
+## PAY-014 — Add an integrated Stripe sandbox checkout demo
+**Priority:** Should
+
+**Story**
+As a developer, I want a local HTTPS checkout demo that uses the payment API and Stripe Embedded Checkout, so that I can validate sandbox payments, webhook outcomes, and refunds in a browser without exposing secret credentials.
+
+**Acceptance criteria**
+- The existing API serves a Development-only HTTPS demo using only vanilla browser assets and the Stripe test publishable key.
+- The demo creates a Card payment through the existing API, mounts only an `embedded_checkout` next action, and shows the local payment status until it reaches a terminal state.
+- It shows a full or partial refund control only for a succeeded payment and displays the resulting refund status.
+- A Development-only client-configuration endpoint returns only `pk_test_...` while the Sandbox Stripe profile is selected; it never returns API or webhook secrets.
+- The checked-in configuration contains no Stripe credentials and documents environment-variable setup, the local development certificate, and Stripe CLI forwarding.
+
+**Sprint 3 demo:** With `PaymentProviders:Card=Stripe`, the Sandbox Stripe profile selected, and test credentials supplied through a secret store, a test client starts an embedded Stripe checkout; a verified webhook makes the payment status accurate for success and decline, then a full or partial test-mode refund is issued and observed through the API.
 
 ---

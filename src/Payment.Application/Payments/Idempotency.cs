@@ -9,6 +9,7 @@ public static class Idempotency
 {
     public const string CreatePaymentOperation = "CreatePayment";
     public const string CapturePaymentOperation = "CapturePayment";
+    public const string RefundPaymentOperation = "RefundPayment";
     public const int FingerprintVersion = 1;
 
     public static string ValidateKey(string? key)

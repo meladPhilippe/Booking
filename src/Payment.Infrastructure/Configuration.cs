@@ -34,10 +34,24 @@ public sealed class DevelopmentMerchantOptions
 public sealed class StripeOptions
 {
     public const string SectionName = "Stripe";
+    public string SelectedProfile { get; init; } = "Sandbox";
+    public Dictionary<string, StripeProfileOptions> Profiles { get; init; } = [];
+}
+
+public sealed class StripeProfileOptions
+{
     public string SecretKey { get; init; } = string.Empty;
     public string WebhookSigningSecret { get; init; } = string.Empty;
     public string? PublishableKey { get; init; }
     public List<string> ReturnUrlOrigins { get; init; } = [];
+}
+
+public sealed record SelectedStripeProfile(string Name, StripeProfileOptions Options);
+
+public sealed class PaymentProviderOptions
+{
+    public const string SectionName = "PaymentProviders";
+    public string Card { get; init; } = "Simulated";
 }
 
 public sealed class PayPalOptions

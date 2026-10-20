@@ -54,18 +54,22 @@ As a developer/tester, I want a deterministic simulated provider, so that we can
 - The simulated provider cannot be selected accidentally in production configuration; startup validation or environment controls prevent silent production use.
 - Unit tests prove the same application workflow works with a fake implementation.
 
-## PAY-005 — Add consuming-application authentication and authorization
+## PAY-005 — Secure multi-merchant payment API access
 **Priority:** Must
 
 **Story**  
-As the module owner, I want API calls authenticated and scoped to a consuming merchant/client, so that one application cannot read or operate on another application's payments.
+As the payment-module owner, I want the Payment API authenticated and authorized for trusted consuming backends, so that each backend can operate only on payments for its authorized merchant and business function, while shoppers can safely use guest or signed-in checkout through the storefront.
 
 **Acceptance criteria**
-- The chosen trust/authentication mechanism is applied at the entry boundary: HTTP/service-to-service authentication for remote callers, or the host application's authenticated user/merchant context for in-process calls.
-- A client can access only payments belonging to its authenticated merchant/client scope.
-- The merchant identity used for scoping comes from the authenticated principal/configuration, not an untrusted request-body field.
-- Unauthenticated and out-of-scope requests return controlled responses without disclosing whether another merchant's payment exists.
-- Authentication/authorization tests cover allowed and denied access.
+- Every Payment API endpoint except provider webhook endpoints and health probes requires an OAuth/OIDC client-credential bearer JWT.
+- JWT validation verifies issuer, audience, expiry, client identity, operation scope, and merchant/tenant claim.
+- Every payment is bound to the merchant identity from the validated token; merchant identity is never accepted from request bodies, browser input, or caller-controlled headers.
+- The storefront backend can create, retrieve, and capture payments only for its merchant. The admin backend can retrieve, refund, and reconcile payments only for its merchant.
+- A caller outside its permitted operation scope receives a controlled `403` response. A caller attempting to access another merchant's payment receives the existing controlled not-found response without confirmation that the payment exists.
+- Browsers never receive Payment API credentials. Guest checkout ownership is validated by the storefront's short-lived checkout session; the storefront calls the Payment API with its own service token.
+- Provider webhooks remain exempt from JWT authentication but require valid Stripe or PayPal signature verification.
+- Audit records identify the calling backend client ID, merchant ID, operation, payment ID, and the initiating staff actor ID when supplied by the trusted admin backend; they never contain access tokens or sensitive payment/provider data.
+- Authentication and authorization tests cover valid tokens, missing/expired/invalid tokens, invalid tenant scope, invalid operation scope, cross-merchant access, guest checkout boundaries, and webhook signature rejection.
 
 **Sprint 1 demo:** A sample consuming business flow initiates a simulated payment through the agreed host-facing contract, receives a module payment ID/status, and reads the payment without any provider-specific types in its code. Demonstrate through HTTP if that adapter is part of the chosen host, or through an in-process contract for a modular monolith.
 

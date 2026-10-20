@@ -9,10 +9,11 @@ using DomainPaymentMethod = Payment.Domain.Enums.PaymentMethod;
 
 namespace Payment.Infrastructure.Providers.PayPal;
 
-public sealed class PayPalPaymentProvider(IHttpClientFactory httpClientFactory, PayPalOptions options) : IPaymentProvider
+public sealed class PayPalPaymentProvider(IHttpClientFactory httpClientFactory, PayPalOptions options) : IPaymentProvider, IRefundProvider, IReconciliationProvider
 {
     public string Name => "PayPal";
     public bool Supports(DomainPaymentMethod method) => method == DomainPaymentMethod.PayPal;
+    public bool SupportsRefunds(DomainPaymentMethod method) => method == DomainPaymentMethod.PayPal;
 
     public async Task<ProviderPaymentOutcome> CreateAsync(ProviderPaymentRequest request, CancellationToken cancellationToken)
     {
@@ -45,7 +46,48 @@ public sealed class PayPalPaymentProvider(IHttpClientFactory httpClientFactory, 
         if (!response.IsSuccessStatusCode) return new ProviderPaymentOutcome(response.StatusCode == System.Net.HttpStatusCode.UnprocessableEntity ? PaymentStatus.Failed : PaymentStatus.RequiresReconciliation, providerReference);
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
         var status = document.RootElement.GetProperty("status").GetString();
-        return new ProviderPaymentOutcome(status == "COMPLETED" ? PaymentStatus.Succeeded : status == "PENDING" ? PaymentStatus.Processing : PaymentStatus.RequiresReconciliation, providerReference);
+        var captureId = TryGetCaptureId(document.RootElement);
+        return new ProviderPaymentOutcome(status == "COMPLETED" ? PaymentStatus.Succeeded : status == "PENDING" ? PaymentStatus.Processing : PaymentStatus.RequiresReconciliation, providerReference, null, captureId);
+    }
+
+    public async Task<ProviderRefundOutcome> RefundAsync(ProviderRefundRequest request, CancellationToken cancellationToken)
+    {
+        var client = httpClientFactory.CreateClient("PayPal");
+        var token = await GetAccessTokenAsync(client, cancellationToken);
+        using var message = new HttpRequestMessage(HttpMethod.Post, $"/v2/payments/captures/{request.ProviderPaymentReference}/refund")
+        {
+            Content = JsonContent.Create(new { amount = new { currency_code = request.Amount.Currency.ToUpperInvariant(), value = request.Amount.Value.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture), }, custom_id = request.RefundId.ToString() })
+        };
+        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        message.Headers.Add("PayPal-Request-Id", $"ref-{request.RefundId:N}");
+        message.Headers.TryAddWithoutValidation("Prefer", "return=representation");
+        using var response = await client.SendAsync(message, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            return new ProviderRefundOutcome(response.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.UnprocessableEntity ? RefundStatus.Failed : RefundStatus.RequiresReconciliation, null);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        var status = document.RootElement.TryGetProperty("status", out var statusValue) ? statusValue.GetString() : null;
+        return new ProviderRefundOutcome(status == "COMPLETED" ? RefundStatus.Succeeded : status is "FAILED" or "DENIED" ? RefundStatus.Failed : RefundStatus.Pending, document.RootElement.GetProperty("id").GetString());
+    }
+
+    public async Task<ProviderReconciliationOutcome> ReconcileAsync(string providerReference, string? providerPaymentReference, CancellationToken cancellationToken)
+    {
+        var client = httpClientFactory.CreateClient("PayPal");
+        var token = await GetAccessTokenAsync(client, cancellationToken);
+        using var message = new HttpRequestMessage(HttpMethod.Get, $"/v2/checkout/orders/{providerReference}");
+        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var response = await client.SendAsync(message, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        var status = document.RootElement.GetProperty("status").GetString();
+        return new ProviderReconciliationOutcome(status == "COMPLETED" ? PaymentStatus.Succeeded : status == "APPROVED" ? PaymentStatus.RequiresAction : PaymentStatus.Processing, providerPaymentReference ?? TryGetCaptureId(document.RootElement));
+    }
+
+    private static string? TryGetCaptureId(JsonElement root)
+    {
+        if (!root.TryGetProperty("purchase_units", out var units) || units.GetArrayLength() == 0) return null;
+        var unit = units[0];
+        if (!unit.TryGetProperty("payments", out var payments) || !payments.TryGetProperty("captures", out var captures) || captures.GetArrayLength() == 0) return null;
+        return captures[0].TryGetProperty("id", out var id) ? id.GetString() : null;
     }
 
     private async Task<string> GetAccessTokenAsync(HttpClient client, CancellationToken cancellationToken)

@@ -3,11 +3,106 @@ services:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
       ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "ChangeThis_LocalOnly_123!"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
     ports:
       - "14333:1433"
     volumes:
       - payment-sql-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\" -C || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  stripe-sandbox-demo:
+    build:
+      context: ./reference/stripe-sandbox-demo
+    environment:
+      VITE_PAYMENT_API_ORIGIN: https://localhost:5001
+      VITE_HTTPS_PFX_PATH: /https/Payment.Api.pfx
+      VITE_HTTPS_PFX_PASSWORD: ${DEMO_HTTPS_PFX_PASSWORD}
+    ports:
+      - "5173:5173"
+    volumes:
+      - type: bind
+        source: ${HOME}/.aspnet/https
+        target: /https
+        read_only: true
+        bind:
+          create_host_path: false
+
+  payment-migrate:
+    profiles: ["release"]
+    build:
+      context: .
+      dockerfile: src/Payment.Api/Dockerfile
+    command: ["--migrate"]
+    environment: &payment-environment
+      ASPNETCORE_ENVIRONMENT: Development
+      Persistence__ConnectionString: Server=sqlserver,1433;Database=BookingPayments;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True
+      PaymentProviders__Card: Stripe
+      Stripe__SelectedProfile: Sandbox
+      Stripe__Profiles__Sandbox__SecretKey: ${STRIPE_SANDBOX_SECRET_KEY}
+      Stripe__Profiles__Sandbox__PublishableKey: ${STRIPE_SANDBOX_PUBLISHABLE_KEY}
+      Stripe__Profiles__Sandbox__WebhookSigningSecret: ${STRIPE_SANDBOX_WEBHOOK_SIGNING_SECRET}
+      Stripe__Profiles__Sandbox__ReturnUrlOrigins__0: ${STRIPE_SANDBOX_RETURN_URL_ORIGIN:-https://localhost:5173}
+      PayPal__ClientId: ${PAYPAL_SANDBOX_CLIENT_ID}
+      PayPal__ClientSecret: ${PAYPAL_SANDBOX_CLIENT_SECRET}
+      PayPal__WebhookId: ${PAYPAL_SANDBOX_WEBHOOK_ID}
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+  payment-api:
+    profiles: ["release"]
+    build:
+      context: .
+      dockerfile: src/Payment.Api/Dockerfile
+    environment:
+      <<: *payment-environment
+      ASPNETCORE_URLS: http://+:8080
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    depends_on:
+      payment-migrate:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+
+  otel-collector:
+    profiles: ["release"]
+    image: otel/opentelemetry-collector-contrib:0.117.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./observability/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+
+  prometheus:
+    profiles: ["release"]
+    image: prom/prometheus:v3.1.0
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    volumes:
+      - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+
+  tempo:
+    profiles: ["release"]
+    image: grafana/tempo:2.6.1
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo.yaml:ro
+
+  loki:
+    profiles: ["release"]
+    image: grafana/loki:3.3.2
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+      - ./observability/loki.yaml:/etc/loki/local-config.yaml:ro
+
+  grafana:
+    profiles: ["release"]
+    image: grafana/grafana:11.4.0
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
 
 volumes:
   payment-sql-data:

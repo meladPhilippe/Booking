@@ -9,6 +9,8 @@ public sealed class PaymentDbContext(DbContextOptions<PaymentDbContext> options)
     public DbSet<DomainPayment> Payments => Set<DomainPayment>();
     public DbSet<IdempotencyOperation> IdempotencyOperations => Set<IdempotencyOperation>();
     public DbSet<ProviderWebhookEvent> ProviderWebhookEvents => Set<ProviderWebhookEvent>();
+    public DbSet<Refund> Refunds => Set<Refund>();
+    public DbSet<OutcomeOutboxMessage> OutcomeOutboxMessages => Set<OutcomeOutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -19,6 +21,7 @@ public sealed class PaymentDbContext(DbContextOptions<PaymentDbContext> options)
         payment.Property(x => x.MerchantReference).HasMaxLength(256).IsRequired();
         payment.Property(x => x.Provider).HasMaxLength(64).IsRequired();
         payment.Property(x => x.ProviderReference).HasMaxLength(256);
+        payment.Property(x => x.ProviderPaymentReference).HasMaxLength(256);
         payment.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         payment.Property(x => x.Method).HasConversion<string>().HasMaxLength(32).IsRequired();
         payment.Property(x => x.RowVersion).IsRowVersion();
@@ -41,7 +44,9 @@ public sealed class PaymentDbContext(DbContextOptions<PaymentDbContext> options)
         idempotency.HasIndex(x => new { x.MerchantId, x.Operation, x.Key }).IsUnique();
         idempotency.HasIndex(x => new { x.MerchantId, x.PaymentId });
         idempotency.HasIndex(x => x.PaymentId);
+        idempotency.HasIndex(x => x.RefundId);
         idempotency.HasOne<DomainPayment>().WithMany().HasForeignKey(x => x.PaymentId).OnDelete(DeleteBehavior.Restrict);
+        idempotency.HasOne<Refund>().WithMany().HasForeignKey(x => x.RefundId).OnDelete(DeleteBehavior.Restrict);
 
         var webhook = modelBuilder.Entity<ProviderWebhookEvent>();
         webhook.ToTable("ProviderWebhookEvents");
@@ -52,5 +57,31 @@ public sealed class PaymentDbContext(DbContextOptions<PaymentDbContext> options)
         webhook.Property(x => x.RelatedObjectId).HasMaxLength(256).IsRequired();
         webhook.Property(x => x.RowVersion).IsRowVersion();
         webhook.HasIndex(x => new { x.Provider, x.ExternalEventId }).IsUnique();
+
+        var refund = modelBuilder.Entity<Refund>();
+        refund.ToTable("Refunds");
+        refund.HasKey(x => x.Id);
+        refund.Property(x => x.MerchantId).HasMaxLength(128).IsRequired();
+        refund.Property(x => x.Provider).HasMaxLength(64).IsRequired();
+        refund.Property(x => x.ProviderReference).HasMaxLength(256);
+        refund.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+        refund.Property(x => x.RowVersion).IsRowVersion();
+        refund.OwnsOne(x => x.Amount, money =>
+        {
+            money.Property(x => x.Value).HasColumnName("Amount").HasColumnType("decimal(19,4)");
+            money.Property(x => x.Currency).HasColumnName("Currency").HasMaxLength(3).IsRequired();
+        });
+        refund.HasIndex(x => new { x.MerchantId, x.PaymentId });
+        refund.HasIndex(x => new { x.Provider, x.ProviderReference });
+        refund.HasOne<DomainPayment>().WithMany().HasForeignKey(x => x.PaymentId).OnDelete(DeleteBehavior.Restrict);
+
+        var outbox = modelBuilder.Entity<OutcomeOutboxMessage>();
+        outbox.ToTable("OutcomeOutboxMessages");
+        outbox.HasKey(x => x.Id);
+        outbox.Property(x => x.EventType).HasMaxLength(128).IsRequired();
+        outbox.Property(x => x.Payload).HasColumnType("nvarchar(max)").IsRequired();
+        outbox.Property(x => x.LastError).HasMaxLength(512);
+        outbox.Property(x => x.RowVersion).IsRowVersion();
+        outbox.HasIndex(x => new { x.DeliveredAt, x.NextAttemptAt });
     }
 }

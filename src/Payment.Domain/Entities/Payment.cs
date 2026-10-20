@@ -27,6 +27,7 @@ public sealed class Payment
     public PaymentMethod Method { get; private set; }
     public string Provider { get; private set; } = string.Empty;
     public string? ProviderReference { get; private set; }
+    public string? ProviderPaymentReference { get; private set; }
     public PaymentStatus Status { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -40,11 +41,12 @@ public sealed class Payment
         return new Payment(Guid.NewGuid(), merchantId.Trim(), merchantReference.Trim(), amount, method, provider.Trim(), now);
     }
 
-    public static Payment Rehydrate(Guid id, string merchantId, string merchantReference, Money amount, PaymentMethod method, string provider, string? providerReference, PaymentStatus status, DateTimeOffset createdAt, DateTimeOffset updatedAt, byte[] rowVersion)
+    public static Payment Rehydrate(Guid id, string merchantId, string merchantReference, Money amount, PaymentMethod method, string provider, string? providerReference, string? providerPaymentReference, PaymentStatus status, DateTimeOffset createdAt, DateTimeOffset updatedAt, byte[] rowVersion)
     {
         var payment = new Payment(id, merchantId, merchantReference, amount, method, provider, createdAt)
         {
             ProviderReference = providerReference,
+            ProviderPaymentReference = providerPaymentReference,
             Status = status,
             UpdatedAt = updatedAt,
             RowVersion = rowVersion
@@ -52,13 +54,14 @@ public sealed class Payment
         return payment;
     }
 
-    public void ApplyOutcome(PaymentStatus nextStatus, string? providerReference, DateTimeOffset now)
+    public void ApplyOutcome(PaymentStatus nextStatus, string? providerReference, DateTimeOffset now, string? providerPaymentReference = null)
     {
         if (!CanTransition(Status, nextStatus))
             throw new InvalidOperationException($"Cannot transition payment from {Status} to {nextStatus}.");
 
         Status = nextStatus;
         ProviderReference = providerReference ?? ProviderReference;
+        ProviderPaymentReference = providerPaymentReference ?? ProviderPaymentReference;
         UpdatedAt = now;
     }
 

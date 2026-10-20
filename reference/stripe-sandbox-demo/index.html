@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stripe Sandbox Checkout Demo</title>
+  <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Booking payment module</p>
+      <h1>Stripe Sandbox Checkout</h1>
+      <p class="intro">A local Development-only demo. Use Stripe test cards only.</p>
+    </header>
+
+    <p id="notice" role="status" aria-live="polite">Loading Stripe sandbox configuration…</p>
+
+    <section class="card" aria-labelledby="create-heading">
+      <h2 id="create-heading">Create a payment</h2>
+      <form id="payment-form">
+        <label>Merchant reference<input id="merchant-reference" required value="reservation-demo-001" maxlength="100"></label>
+        <div class="columns">
+          <label>Amount<input id="amount" required type="number" min="0.01" step="0.01" value="500.00"></label>
+          <label>Currency<select id="currency"><option value="EGP">EGP</option><option value="USD">USD</option></select></label>
+        </div>
+        <button id="create-payment" type="submit">Create secure checkout</button>
+      </form>
+    </section>
+
+    <section id="payment-details" class="card hidden" aria-labelledby="payment-heading">
+      <h2 id="payment-heading">Payment status</h2>
+      <dl>
+        <dt>Payment ID</dt><dd id="payment-id"></dd>
+        <dt>Provider reference</dt><dd id="provider-reference"></dd>
+        <dt>Status</dt><dd id="payment-status"></dd>
+      </dl>
+      <div id="checkout"></div>
+    </section>
+
+    <section id="refund-panel" class="card hidden" aria-labelledby="refund-heading">
+      <h2 id="refund-heading">Refund succeeded payment</h2>
+      <form id="refund-form">
+        <label>Refund amount<input id="refund-amount" required type="number" min="0.01" step="0.01"></label>
+        <button type="submit">Create refund</button>
+      </form>
+      <p id="refund-status" role="status"></p>
+    </section>
+  </main>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
