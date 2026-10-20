@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "//": "dev starts the local tutorial; build checks that the browser files bundle correctly.",
     "dev": "vite",
     "build": "vite build"
   },

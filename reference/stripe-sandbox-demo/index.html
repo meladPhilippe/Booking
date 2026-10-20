@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Stripe Sandbox Checkout Demo</title>
+  <!-- Stripe's browser library renders the hosted payment form. Card details
+       go directly to Stripe's UI rather than through this demo application. -->
   <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
@@ -14,8 +16,11 @@
       <p class="intro">A local Development-only demo. Use Stripe test cards only.</p>
     </header>
 
+    <!-- This live region announces safe progress and error messages. -->
     <p id="notice" role="status" aria-live="polite">Loading Stripe sandbox configuration…</p>
 
+    <!-- Step 1 on screen: collect only the order details that our Payment API
+         needs to create a Checkout Session. No card fields appear here. -->
     <section class="card" aria-labelledby="create-heading">
       <h2 id="create-heading">Create a payment</h2>
       <form id="payment-form">
@@ -28,16 +33,23 @@
       </form>
     </section>
 
+    <!-- Step 2 on screen: JavaScript reveals this after the API creates a
+         module payment and returns the action needed to mount Checkout. -->
     <section id="payment-details" class="card hidden" aria-labelledby="payment-heading">
       <h2 id="payment-heading">Payment status</h2>
       <dl>
         <dt>Payment ID</dt><dd id="payment-id"></dd>
         <dt>Provider reference</dt><dd id="provider-reference"></dd>
         <dt>Status</dt><dd id="payment-status"></dd>
+        <dt>Webhook confirmation</dt><dd id="webhook-status">Waiting for Stripe…</dd>
+        <dt>Last payment update</dt><dd id="payment-updated-at">Not available yet</dd>
       </dl>
+      <!-- Stripe.js inserts Stripe's secure Embedded Checkout UI in this area. -->
       <div id="checkout"></div>
     </section>
 
+    <!-- Step 3 on screen: this sandbox-only panel appears only after a verified
+         webhook records a successful payment. -->
     <section id="refund-panel" class="card hidden" aria-labelledby="refund-heading">
       <h2 id="refund-heading">Refund succeeded payment</h2>
       <form id="refund-form">
@@ -47,6 +59,7 @@
       <p id="refund-status" role="status"></p>
     </section>
   </main>
+  <!-- The module contains the tutorial's browser-side interaction steps. -->
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
