@@ -72,7 +72,7 @@ public sealed class PaymentService(
         IPaymentProvider provider;
         try
         {
-            provider = providerResolver.Resolve(command.Method);
+            provider = providerResolver.ResolveForNewPayment(command.Method);
         }
         catch (InvalidOperationException)
         {
@@ -91,7 +91,7 @@ public sealed class PaymentService(
                 command.MerchantReference,
                 amount,
                 command.Method,
-                provider.Name,
+                provider.ProviderKey,
                 now
             );
         }
@@ -190,7 +190,7 @@ public sealed class PaymentService(
     }
 
     /// <summary>
-    /// Idempotently captures an approved PayPal payment and records its resulting provider status.
+    /// Idempotently captures an approved payment when its persisted provider supports capture.
     /// </summary>
     public async Task<PaymentResponse> CaptureAsync(
         Guid paymentId,
@@ -198,13 +198,12 @@ public sealed class PaymentService(
         CancellationToken cancellationToken
     )
     {
-        // Step 1: Load the payment and ensure it is an eligible PayPal capture.
+        // Step 1: Load the payment and ensure it is an eligible provider capture.
         var payment =
             await repository.GetAsync(merchantContext.MerchantId, paymentId, cancellationToken)
             ?? throw new PaymentNotFoundException(paymentId);
         if (
-            payment.Method != PaymentMethod.PayPal
-            || string.IsNullOrWhiteSpace(payment.ProviderReference)
+            string.IsNullOrWhiteSpace(payment.ProviderReference)
             || payment.Status is not (PaymentStatus.RequiresAction or PaymentStatus.Processing)
         )
             throw new PaymentValidationException(
@@ -241,12 +240,17 @@ public sealed class PaymentService(
             );
         if (claim.Kind == IdempotentCreateKind.Replay)
             return ToResponse(payment, null);
-        // Step 3: Capture through PayPal and use reconciliation when the result is uncertain.
-        var provider = providerResolver.Resolve(PaymentMethod.PayPal);
+        // Step 3: Capture through the persisted provider and use reconciliation when uncertain.
+        var provider = providerResolver.ResolveByKey(payment.Provider);
+        if (provider is not ICaptureProvider captureProvider)
+            throw new PaymentValidationException(
+                "capture_not_supported",
+                "This payment provider does not support capture."
+            );
         ProviderPaymentOutcome outcome;
         try
         {
-            outcome = await provider.CaptureAsync(
+            outcome = await captureProvider.CaptureAsync(
                 payment.Id,
                 payment.ProviderReference,
                 cancellationToken
@@ -313,8 +317,8 @@ public sealed class PaymentService(
             throw new PaymentValidationException("invalid_amount", exception.Message);
         }
         // Step 3: Resolve a provider that supports refunds for this payment method.
-        var provider = providerResolver.Resolve(payment.Method) as IRefundProvider;
-        if (provider is null || !provider.SupportsRefunds(payment.Method))
+        var provider = providerResolver.ResolveByKey(payment.Provider) as IRefundProvider;
+        if (provider is null)
             throw new PaymentValidationException(
                 "refund_not_supported",
                 "Refunds are not supported for this payment method."
@@ -410,7 +414,7 @@ public sealed class PaymentService(
             );
         // Step 2: Resolve a provider capable of retrieving the authoritative external state.
         var provider =
-            providerResolver.Resolve(payment.Method) as IReconciliationProvider
+            providerResolver.ResolveByKey(payment.Provider) as IPaymentReconciliationProvider
             ?? throw new PaymentValidationException(
                 "reconciliation_not_supported",
                 "This payment provider cannot reconcile this payment."

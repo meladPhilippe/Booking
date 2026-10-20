@@ -48,10 +48,10 @@ public sealed class StripeProfileOptions
 
 public sealed record SelectedStripeProfile(string Name, StripeProfileOptions Options);
 
-public sealed class PaymentProviderOptions
+public sealed class PaymentRoutingOptions
 {
-    public const string SectionName = "PaymentProviders";
-    public string Card { get; init; } = "Simulated";
+    public const string SectionName = "PaymentRouting";
+    public Dictionary<string, string> Methods { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
 public sealed class PayPalOptions

@@ -23,6 +23,7 @@ As the payment module, I want a provider-neutral payment model with explicit inv
 
 **Acceptance criteria**
 - Payment contains a module-generated payment ID, merchant/client reference, money, method, provider identity/reference, status, timestamps, and concurrency version as appropriate.
+- The persisted provider identity is an immutable, stable machine `ProviderKey` rather than a display label. Provider-operation, provider-payment, and provider-refund identifiers have distinct documented meanings where applicable.
 - Payment does not depend on order, reservation, seat, event, or cart domain classes.
 - Negative/zero amounts, unsupported currencies, invalid currency precision, and invalid transitions are rejected according to agreed rules.
 - Authorization, successful capture/payment, refund, cancellation, and indeterminate provider outcomes are not treated as interchangeable states.
@@ -52,6 +53,7 @@ As a developer/tester, I want a deterministic simulated provider, so that we can
 - The simulated provider can produce controlled outcomes for automated tests.
 - A create-payment request can traverse the selected host-facing entry point → application workflow → resolver → simulated provider → result mapping.
 - The simulated provider cannot be selected accidentally in production configuration; startup validation or environment controls prevent silent production use.
+- In Development, only the simulated provider is registered and routing may select only `simulated`; unconfigured methods return a controlled unsupported-method error.
 - Unit tests prove the same application workflow works with a fake implementation.
 
 ## PAY-005 — Secure multi-merchant payment API access

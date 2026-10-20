@@ -37,11 +37,15 @@ Use the returned `paymentId` with `GET /api/v1/payments/{paymentId}`. `X-Simulat
 
 ## Stripe sandbox checkout demo
 
-Never place Stripe credentials in `appsettings.json`. Export test credentials in a terminal, then start the API:
+Development intentionally registers only the simulated provider. The existing
+Stripe browser demo is therefore disabled until a dedicated Sandbox environment
+is introduced; do not override Development routing to `stripe`.
+
+Never place Stripe credentials in `appsettings.json`. The former local setup
+was:
 
 ```bash
 export ASPNETCORE_ENVIRONMENT=Development
-export PaymentProviders__Card=Stripe
 export Stripe__SelectedProfile=Sandbox
 export Stripe__Profiles__Sandbox__SecretKey='sk_test_...'
 export Stripe__Profiles__Sandbox__PublishableKey='pk_test_...'

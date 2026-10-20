@@ -4,5 +4,6 @@ namespace Payment.Application.Abstractions;
 
 public interface IPaymentProviderResolver
 {
-    IPaymentProvider Resolve(PaymentMethod method);
+    IPaymentProvider ResolveForNewPayment(PaymentMethod method);
+    IPaymentProvider ResolveByKey(string providerKey);
 }

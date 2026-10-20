@@ -7,7 +7,7 @@ namespace Payment.Api.Controllers;
 [Route("api/v1/client-config/stripe")]
 public sealed class StripeClientConfigurationController(
     IWebHostEnvironment environment,
-    PaymentProviderOptions providers,
+    PaymentRoutingOptions routing,
     SelectedStripeProfile stripe
 ) : ControllerBase
 {
@@ -16,7 +16,8 @@ public sealed class StripeClientConfigurationController(
     public ActionResult<StripeClientConfiguration> Get()
     {
         if (!environment.IsDevelopment()
-            || !string.Equals(providers.Card, "Stripe", StringComparison.OrdinalIgnoreCase)
+            || !routing.Methods.TryGetValue("Card", out var providerKey)
+            || !string.Equals(providerKey, "stripe", StringComparison.OrdinalIgnoreCase)
             || !string.Equals(stripe.Name, "Sandbox", StringComparison.OrdinalIgnoreCase)
             || stripe.Options.PublishableKey is not { } publishableKey
             || !publishableKey.StartsWith("pk_test_", StringComparison.Ordinal))

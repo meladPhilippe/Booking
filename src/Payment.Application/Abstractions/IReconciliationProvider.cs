@@ -1,6 +1,6 @@
 namespace Payment.Application.Abstractions;
 
-public interface IReconciliationProvider
+public interface IPaymentReconciliationProvider
 {
     Task<ProviderReconciliationOutcome> ReconcileAsync(
         string providerReference,

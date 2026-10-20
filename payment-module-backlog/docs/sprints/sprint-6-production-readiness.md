@@ -11,7 +11,7 @@ As an operator/support engineer, I want to trace a payment across the host-facin
 **Acceptance criteria**
 - A correlation ID and module payment ID connect related logs where available.
 - Important lifecycle actions—creation, provider call outcome, webhook processing, refund, reconciliation, and manual intervention—are auditable according to agreed retention/access policies.
-- Metrics cover payment outcomes, provider errors/timeouts, webhook verification/deduplication failures, reconciliation backlog, and refund outcomes.
+- Metrics cover payment outcomes, provider errors/timeouts, webhook verification/deduplication failures, reconciliation backlog/age/attempt exhaustion, worker claim failures, and refund outcomes.
 - Logs do not contain credentials, raw card data, security codes, access tokens, or unredacted sensitive provider payloads.
 - Dashboard/alert thresholds are agreed with the service owner before release.
 
@@ -39,7 +39,7 @@ As an operator/integrator, I want repeatable packaging/deployment and clear inte
 - Database migration/rollback approach is documented and tested in a representative environment.
 - Readiness/liveness behaviour is documented and verified.
 - An integration guide includes authentication, create/query/refund contracts, idempotency key rules, statuses, redirects/return handling, webhook/event behaviour, and error handling.
-- Runbook covers provider outage, stuck/indeterminate payments, webhook failures, reconciliation, secret rotation, and support escalation.
+- Runbook covers provider outage, stuck/indeterminate payments and refunds, worker retry exhaustion, webhook failures, reconciliation, secret rotation, and support escalation.
 - Production uses real provider credentials only from the approved secret store; simulated providers are disabled.
 
 ## PAY-023 — Execute business acceptance and release readiness

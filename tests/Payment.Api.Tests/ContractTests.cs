@@ -21,7 +21,7 @@ public sealed class ContractTests
     {
         var controller = new StripeClientConfigurationController(
             new TestEnvironment(Environments.Development),
-            new PaymentProviderOptions { Card = "Stripe" },
+            new PaymentRoutingOptions { Methods = new Dictionary<string, string> { ["Card"] = "stripe" } },
             new SelectedStripeProfile("Sandbox", new StripeProfileOptions { PublishableKey = "pk_test_demo" }));
 
         var result = controller.Get();
@@ -36,7 +36,7 @@ public sealed class ContractTests
     {
         var controller = new StripeClientConfigurationController(
             new TestEnvironment(Environments.Production),
-            new PaymentProviderOptions { Card = "Stripe" },
+            new PaymentRoutingOptions { Methods = new Dictionary<string, string> { ["Card"] = "stripe" } },
             new SelectedStripeProfile("Sandbox", new StripeProfileOptions { PublishableKey = "pk_test_demo" }));
 
         var result = controller.Get();

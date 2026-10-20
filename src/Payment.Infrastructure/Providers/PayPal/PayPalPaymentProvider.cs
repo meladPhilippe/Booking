@@ -5,15 +5,12 @@ using System.Text;
 using System.Text.Json;
 using Payment.Application.Abstractions;
 using Payment.Domain.Enums;
-using DomainPaymentMethod = Payment.Domain.Enums.PaymentMethod;
 
 namespace Payment.Infrastructure.Providers.PayPal;
 
-public sealed class PayPalPaymentProvider(IHttpClientFactory httpClientFactory, PayPalOptions options) : IPaymentProvider, IRefundProvider, IReconciliationProvider
+public sealed class PayPalPaymentProvider(IHttpClientFactory httpClientFactory, PayPalOptions options) : IPaymentProvider, ICaptureProvider, IRefundProvider, IPaymentReconciliationProvider
 {
-    public string Name => "PayPal";
-    public bool Supports(DomainPaymentMethod method) => method == DomainPaymentMethod.PayPal;
-    public bool SupportsRefunds(DomainPaymentMethod method) => method == DomainPaymentMethod.PayPal;
+    public string ProviderKey => "paypal";
 
     public async Task<ProviderPaymentOutcome> CreateAsync(ProviderPaymentRequest request, CancellationToken cancellationToken)
     {

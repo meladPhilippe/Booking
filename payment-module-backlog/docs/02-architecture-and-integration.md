@@ -13,6 +13,53 @@
 9. **Test the core in isolation.** Fake providers are for deterministic tests and development, not a silent production fallback.
 10. **Do not promise a fallback provider silently.** Unsupported methods and unavailable providers return explicit, controlled outcomes.
 
+## Provider Routing and Capability Model
+
+A payment method and a payment provider are intentionally separate:
+
+```text
+Card   → stripe | adyen | simulated
+PayPal → paypal
+```
+
+Configuration selects a provider only while creating a new payment. The module
+then persists an immutable `ProviderKey` such as `stripe`, `paypal`, or
+`simulated`. Later operations resolve that persisted key, rather than resolving
+the current route for the method. This prevents a configuration change from
+refunding or reconciling an existing Stripe payment through a newly selected
+Card provider.
+
+```text
+New payment:             PaymentMethod → configured ProviderKey
+Existing payment/refund: persisted ProviderKey → provider registry
+```
+
+The provider registry has two explicit operations:
+
+```csharp
+IPaymentProvider ResolveForNewPayment(PaymentMethod method);
+IPaymentProvider ResolveByKey(string providerKey);
+```
+
+`IPaymentProvider` covers initiation only. Optional provider capabilities are
+checked after resolving the persisted provider:
+
+```csharp
+ICaptureProvider
+IRefundProvider
+IPaymentReconciliationProvider
+IRefundReconciliationProvider
+```
+
+Use `ProviderOperationId` for the initial external flow (Stripe Checkout
+Session or PayPal Order), `ProviderPaymentId` for the resulting charge/capture
+(Stripe PaymentIntent or PayPal Capture), and `ProviderRefundId` for a refund.
+Avoid `ProviderSettlementId`: settlement has a distinct financial meaning.
+
+`IStripeGateway` remains an Infrastructure anti-corruption layer. PayPal should
+use an equivalent `IPayPalGateway` so protocol/OAuth/HTTP concerns do not leak
+into provider outcome mapping.
+
 ---
 
 ## Keep Payment Initiation and Outcome Propagation Separate

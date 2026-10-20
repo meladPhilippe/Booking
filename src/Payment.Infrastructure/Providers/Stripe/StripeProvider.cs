@@ -2,20 +2,15 @@ using Microsoft.Extensions.Logging;
 using Payment.Application.Abstractions;
 using Payment.Domain.Enums;
 using Stripe;
-using DomainPaymentMethod = Payment.Domain.Enums.PaymentMethod;
 
 namespace Payment.Infrastructure.Providers.Stripe;
 
 public sealed class StripeProvider(IStripeGateway gateway, ILogger<StripeProvider>? logger = null, PaymentMetrics? metrics = null)
     : IPaymentProvider,
         IRefundProvider,
-        IReconciliationProvider
+        IPaymentReconciliationProvider
 {
-    public string Name => "Stripe";
-
-    public bool Supports(DomainPaymentMethod method) => method == DomainPaymentMethod.Card;
-
-    public bool SupportsRefunds(DomainPaymentMethod method) => method == DomainPaymentMethod.Card;
+    public string ProviderKey => "stripe";
 
     public async Task<ProviderPaymentOutcome> CreateAsync(
         ProviderPaymentRequest request,
@@ -49,12 +44,6 @@ public sealed class StripeProvider(IStripeGateway gateway, ILogger<StripeProvide
             return new ProviderPaymentOutcome(PaymentStatus.Failed, null);
         }
     }
-
-    public Task<ProviderPaymentOutcome> CaptureAsync(
-        Guid paymentId,
-        string providerReference,
-        CancellationToken cancellationToken
-    ) => throw new NotSupportedException("Stripe embedded checkout does not use the capture flow.");
 
     public async Task<ProviderRefundOutcome> RefundAsync(
         ProviderRefundRequest request,
@@ -125,7 +114,7 @@ public sealed class StripeProvider(IStripeGateway gateway, ILogger<StripeProvide
     private void LogStripeFailureCore(string operation, StripeException exception)
     {
         var reason = exception.StripeError?.Type ?? exception.GetType().Name;
-        metrics?.ProviderFailure(Name, operation, reason);
+        metrics?.ProviderFailure(ProviderKey, operation, reason);
         logger?.LogWarning(
             "Stripe failed to {Operation}. Type: {StripeErrorType}; code: {StripeErrorCode}; parameter: {StripeErrorParameter}",
             operation,

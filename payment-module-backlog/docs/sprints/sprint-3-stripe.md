@@ -11,6 +11,7 @@ As a customer, I want to pay by card through Stripe's supported checkout flow, s
 **Acceptance criteria**
 - Stripe SDK/API calls live only in the Stripe infrastructure adapter.
 - The application workflow creates the provider operation using the persisted local payment/idempotency context.
+- Stripe is selected for a new Card payment by configuration, but every later Stripe operation is selected by the payment's persisted `ProviderKey` (`stripe`), never by the current Card route.
 - The checkout response contains only the provider-approved redirect/client-action information the client needs.
 - Provider IDs are stored as provider references and are not substituted for the module's payment ID.
 - Declines, validation errors, provider unavailability, and uncertain responses map to documented provider-neutral outcomes.
@@ -52,8 +53,9 @@ As an operator, I want Stripe configuration validated and integration failures d
 As a developer, I want a selectable Stripe sandbox provider for card payments and refunds, so that I can validate the real Stripe integration safely without handling card data or affecting live payments.
 
 **Acceptance criteria**
-- `StripeProvider` implements `IPaymentProvider` and `IRefundProvider`, supports Card only, and selects test credentials through the Sandbox Stripe profile in Development.
-- It uses Stripe test-mode embedded Checkout, local payment/refund IDs as idempotency keys, and provider-neutral outcomes; Checkout Session and PaymentIntent references are persisted separately.
+- `StripeProvider` implements initiation plus only the optional capabilities it supports: refund and payment/refund reconciliation; embedded Checkout does not require a generic capture capability.
+- It uses Stripe test-mode embedded Checkout, local payment/refund IDs as durable idempotency keys, and provider-neutral outcomes; Checkout Session (`ProviderOperationId`) and PaymentIntent (`ProviderPaymentId`) references are persisted separately.
+- If creation times out before the Checkout Session ID is received, recovery can safely repeat the original request using its persisted Stripe idempotency key and recover the original external operation.
 - Full and partial refunds use the persisted PaymentIntent reference and are safely idempotent.
 - Sandbox startup requires an `sk_test_` key, webhook signing secret, and allowed return origins; no credential or card data is committed, persisted, or logged.
 - Verified sandbox webhooks are deduplicated under the sandbox provider identity and apply only legal payment/refund state transitions.
@@ -72,6 +74,6 @@ As a developer, I want a local HTTPS checkout demo that uses the payment API and
 - A Development-only client-configuration endpoint returns only `pk_test_...` while the Sandbox Stripe profile is selected; it never returns API or webhook secrets.
 - The checked-in configuration contains no Stripe credentials and documents environment-variable setup, the local development certificate, and Stripe CLI forwarding.
 
-**Sprint 3 demo:** With `PaymentProviders:Card=Stripe`, the Sandbox Stripe profile selected, and test credentials supplied through a secret store, a test client starts an embedded Stripe checkout; a verified webhook makes the payment status accurate for success and decline, then a full or partial test-mode refund is issued and observed through the API.
+**Sprint 3 demo:** With `PaymentRouting:Methods:Card=stripe`, the Sandbox Stripe profile selected, and test credentials supplied through a secret store, a test client starts an embedded Stripe checkout; a verified webhook makes the payment status accurate for success and decline, then a full or partial test-mode refund is issued and observed through the API.
 
 ---

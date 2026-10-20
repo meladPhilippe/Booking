@@ -16,6 +16,7 @@ public sealed class PaymentServiceTests
         var result = await service.CreateAsync(new CreatePaymentCommand("reservation-7", 500m, "EGP", PaymentMethod.Card, "https://merchant.test/return", "https://merchant.test/cancel", "key-1"), CancellationToken.None);
         Assert.Equal(PaymentStatus.Succeeded, result.Payment.Status);
         Assert.Equal("reservation-7", result.Payment.MerchantReference);
+        Assert.Equal("fake", result.Payment.Provider);
         Assert.NotEqual(Guid.Empty, result.Payment.PaymentId);
     }
 
@@ -58,25 +59,25 @@ public sealed class PaymentServiceTests
     private sealed class Merchant : IMerchantContext { public string MerchantId => "merchant-test"; }
     private sealed class Currencies : ICurrencyRules { public bool TryGetDecimalPlaces(string currency, out int decimalPlaces) { decimalPlaces = 2; return currency == "EGP"; } }
     private sealed class ReturnUrls : IReturnUrlPolicy { public bool IsAllowed(Uri returnUrl) => returnUrl.Host == "merchant.test"; }
-    private sealed class Resolver(IPaymentProvider provider) : IPaymentProviderResolver { public IPaymentProvider Resolve(PaymentMethod method) => provider; }
+    private sealed class Resolver(IPaymentProvider provider) : IPaymentProviderResolver
+    {
+        public IPaymentProvider ResolveForNewPayment(PaymentMethod method) => provider;
+        public IPaymentProvider ResolveByKey(string providerKey) => provider;
+    }
     private sealed class FakeProvider(PaymentStatus status) : IPaymentProvider
     {
-        public string Name => "Fake";
-        public bool Supports(PaymentMethod method) => true;
+        public string ProviderKey => "fake";
         public Task<ProviderPaymentOutcome> CreateAsync(ProviderPaymentRequest request, CancellationToken cancellationToken) => Task.FromResult(new ProviderPaymentOutcome(status, "fake-ref"));
-        public Task<ProviderPaymentOutcome> CaptureAsync(Guid paymentId, string providerReference, CancellationToken cancellationToken) => Task.FromResult(new ProviderPaymentOutcome(status, providerReference));
     }
     private sealed class CountingProvider : IPaymentProvider
     {
         public int Calls { get; private set; }
-        public string Name => "Fake";
-        public bool Supports(PaymentMethod method) => true;
+        public string ProviderKey => "fake";
         public Task<ProviderPaymentOutcome> CreateAsync(ProviderPaymentRequest request, CancellationToken cancellationToken)
         {
             Calls++;
             return Task.FromResult(new ProviderPaymentOutcome(PaymentStatus.Succeeded, "fake-ref"));
         }
-        public Task<ProviderPaymentOutcome> CaptureAsync(Guid paymentId, string providerReference, CancellationToken cancellationToken) => Task.FromResult(new ProviderPaymentOutcome(PaymentStatus.Succeeded, providerReference));
     }
     private sealed class InMemoryRepository : IPaymentRepository
     {

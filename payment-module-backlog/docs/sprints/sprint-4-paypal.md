@@ -13,6 +13,7 @@ As a customer, I want to pay through PayPal, so that the module supports a secon
 - The flow supports the required create/approval/return/capture steps for the chosen PayPal integration.
 - The API represents customer action/redirect requirements in a provider-neutral response shape.
 - The local payment operation and idempotency context are persisted before external operations that can move money.
+- PayPal HTTP, OAuth, request construction, and signature-verification protocol details live behind an `IPayPalGateway`; `PayPalPaymentProvider` maps the gateway's provider-neutral results.
 - Approval is not treated as successful capture unless the chosen flow's confirmed semantics say the funds have been captured.
 - PayPal decline, expiration, timeout, provider error, and success are mapped to documented neutral outcomes.
 - Sandbox end-to-end tests demonstrate successful and unsuccessful payment flows.
@@ -37,11 +38,11 @@ As the payment module, I want to authenticate and process PayPal webhook notific
 As the payment module, I want payment-method selection separated from provider implementation, so that the core workflow can support more providers later without being rewritten.
 
 **Acceptance criteria**
-- A dedicated resolver selects the requested method strategy using a stable identifier.
-- Initial configuration explicitly maps supported methods to Stripe or PayPal; no silent fallback to a different method/provider occurs.
-- The method and provider are recorded separately where they represent different concepts.
+- A provider registry resolves a configured route for a new payment and resolves a persisted `ProviderKey` for an existing payment, refund, capture, or reconciliation operation.
+- Initial configuration explicitly maps supported methods to stable provider keys (`Card` → `stripe`, `PayPal` → `paypal`); no silent fallback to a different method/provider occurs.
+- The method and immutable provider key are recorded separately where they represent different concepts. Changing a route affects new payments only.
 - Unsupported method/provider/capability combinations return a controlled error before attempting an unsupported operation.
-- Adding a new provider implementation does not require adding provider-specific branches to the main application workflow.
+- Optional capabilities (`ICaptureProvider`, `IRefundProvider`, and reconciliation capabilities) are checked after resolving the provider key. Adding a new provider implementation does not require provider-specific branches in the main application workflow.
 
 **Sprint 4 demo:** The same create/status API supports a Stripe card checkout and PayPal checkout; both are backed by real sandbox integrations and map results into the shared payment state model.
 

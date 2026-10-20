@@ -5,9 +5,7 @@ namespace Payment.Infrastructure.Providers;
 
 public sealed class SimulatedPaymentProvider(SimulationOptions options) : IPaymentProvider
 {
-    public string Name => "Simulated";
-
-    public bool Supports(PaymentMethod method) => method == PaymentMethod.Card;
+    public string ProviderKey => "simulated";
 
     public Task<ProviderPaymentOutcome> CreateAsync(
         ProviderPaymentRequest request,
@@ -43,10 +41,4 @@ public sealed class SimulatedPaymentProvider(SimulationOptions options) : IPayme
         };
         return Task.FromResult(outcome);
     }
-
-    public Task<ProviderPaymentOutcome> CaptureAsync(
-        Guid paymentId,
-        string providerReference,
-        CancellationToken cancellationToken
-    ) => Task.FromResult(new ProviderPaymentOutcome(PaymentStatus.Succeeded, providerReference));
 }

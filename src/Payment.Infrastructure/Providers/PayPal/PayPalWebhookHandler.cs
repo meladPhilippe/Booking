@@ -66,7 +66,7 @@ public sealed class PayPalWebhookHandler(
             if (
                 !await repository.TryRecordWebhookEventAsync(
                     ProviderWebhookEvent.Create(
-                        "PayPal",
+                        "paypal",
                         eventId,
                         eventType,
                         relatedId,
@@ -109,7 +109,7 @@ public sealed class PayPalWebhookHandler(
         if (
             !await repository.TryRecordWebhookEventAsync(
                 ProviderWebhookEvent.Create(
-                    "PayPal",
+                    "paypal",
                     eventId,
                     eventType,
                     relatedId,

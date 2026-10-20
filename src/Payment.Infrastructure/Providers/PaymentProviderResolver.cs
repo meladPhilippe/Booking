@@ -5,23 +5,21 @@ namespace Payment.Infrastructure.Providers;
 
 public sealed class PaymentProviderResolver(
     IEnumerable<IPaymentProvider> providers,
-    PaymentProviderOptions options
+    PaymentRoutingOptions routing
 ) : IPaymentProviderResolver
 {
-    public IPaymentProvider Resolve(PaymentMethod method) =>
-        providers.FirstOrDefault(x =>
-            x.Supports(method)
-            && string.Equals(x.Name, ProviderNameFor(method), StringComparison.OrdinalIgnoreCase)
-        )
-        ?? throw new InvalidOperationException(
-            $"Provider '{ProviderNameFor(method)}' does not support {method}."
-        );
+    private readonly IReadOnlyDictionary<string, IPaymentProvider> providerByKey = providers
+        .ToDictionary(provider => provider.ProviderKey, StringComparer.OrdinalIgnoreCase);
 
-    private string ProviderNameFor(PaymentMethod method) =>
-        method switch
-        {
-            PaymentMethod.Card => options.Card,
-            PaymentMethod.PayPal => "PayPal",
-            _ => throw new InvalidOperationException($"No provider is configured for {method}."),
-        };
+    public IPaymentProvider ResolveForNewPayment(PaymentMethod method)
+    {
+        if (!routing.Methods.TryGetValue(method.ToString(), out var providerKey))
+            throw new InvalidOperationException($"No provider is configured for {method}.");
+        return ResolveByKey(providerKey);
+    }
+
+    public IPaymentProvider ResolveByKey(string providerKey) =>
+        providerByKey.TryGetValue(providerKey, out var provider)
+            ? provider
+            : throw new InvalidOperationException($"Provider '{providerKey}' is not registered.");
 }
